@@ -45,7 +45,6 @@ except ImportError:
 
 from airflow.providers.google.cloud.operators.dataproc import (
     DataprocCreateClusterOperator,
-    DataprocDeleteClusterOperator,
     DataprocSubmitJobOperator,
 )
 
@@ -227,20 +226,27 @@ with DAG(
         execution_timeout=timedelta(minutes=30),
     )
 
-    # Runs when everything upstream has finished, provided the cluster was actually created
-    # (ALL_DONE_MIN_ONE_SUCCESS). If download_new_months skipped the run, no cluster exists and this is skipped too.
-    delete_cluster = DataprocDeleteClusterOperator(
+    @task(
         task_id="delete_cluster",
-        project_id=PROJECT_ID,
-        region=REGION,
-        cluster_name=CLUSTER_NAME,
         trigger_rule=getattr(TriggerRule, "ALL_DONE_MIN_ONE_SUCCESS", TriggerRule.ALL_DONE),
         retries=3,
         retry_delay=timedelta(minutes=1),
     )
+    def delete_cluster() -> None:
+        from google.api_core.exceptions import NotFound
+        from airflow.providers.google.cloud.hooks.dataproc import DataprocHook
+
+        hook = DataprocHook()
+        try:
+            op = hook.delete_cluster(project_id=PROJECT_ID, region=REGION, cluster_name=CLUSTER_NAME)
+            hook.wait_for_operation(timeout=20 * 60, result_retry=None, operation=op)
+            print(f"Deleted cluster {CLUSTER_NAME}")
+        except NotFound:
+            print(f"Cluster {CLUSTER_NAME} not found; it may already be deleted")
 
     done = EmptyOperator(task_id="done")  # all_success: fails the run if run/validate failed
 
+    cleanup = delete_cluster()
     download_new_months() >> create_cluster >> run_medallion >> validate_output
-    [create_cluster, run_medallion, validate_output] >> delete_cluster
-    [validate_output, delete_cluster] >> done
+    [create_cluster, run_medallion, validate_output] >> cleanup
+    [validate_output, cleanup] >> done
