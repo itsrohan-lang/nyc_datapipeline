@@ -1,0 +1,60 @@
+name: ci-cd
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest -q --ignore=tests/test_dag.py
+
+  dag-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Airflow + Google provider (pinned by Airflow's constraints)
+        run: |
+          pip install pytest "apache-airflow==2.10.5" apache-airflow-providers-google apache-airflow-providers-openlineage \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.11.txt"
+      - run: airflow db migrate
+      - run: pytest -q tests/test_dag.py
+    env:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, dag-check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation
+    env:
+      BUCKET: ${{ vars.GCS_BUCKET || 'nyc_taxi_51124112026' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Upload Spark code (immutable copy per commit + moving "latest")
+        run: |
+          gcloud storage cp src/*.py "gs://${BUCKET}/code/${GITHUB_SHA}/"
+          gcloud storage cp src/*.py "gs://${BUCKET}/code/latest/"

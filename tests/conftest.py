@@ -1,0 +1,16 @@
+import pytest
+
+
+@pytest.fixture(scope="session")
+def spark():
+    from pyspark.sql import SparkSession  # imported lazily so the DAG-only CI job needs no pyspark
+
+    session = (
+        SparkSession.builder.master("local[2]").appName("tests")
+        .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.ui.enabled", "false")
+        .getOrCreate()
+    )
+    yield session
+    session.stop()
