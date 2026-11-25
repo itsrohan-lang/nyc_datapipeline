@@ -50,7 +50,7 @@ export AIRFLOW__CORE__DAGS_FOLDER=$PWD/dags
 source .env && airflow standalone
 ```
 Trigger `nyc_taxi_dataproc`. Params: `month` (`YYYY-MM`) and `force_rebuild` (rebuild even if nothing new).
-Cluster per run: single node, `e2-standard-4`, deleted at the end, plus a 6 h auto-delete TTL as a safety net.
+Cluster per run: single node, `e2-standard-8` by default (override `DATAPROC_MACHINE_TYPE`), deleted at the end, plus a 6 h auto-delete TTL as a safety net.
 
 ## 4b. Run Airflow on Compute Engine (instead of your laptop)
 

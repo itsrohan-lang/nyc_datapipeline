@@ -56,7 +56,7 @@ RAW_PREFIX = os.environ.get("GCS_RAW_PREFIX", "raw/nyc_tlc")
 LAKE_PREFIX = os.environ.get("GCS_LAKE_PREFIX", "medallion")
 CODE_PREFIX = os.environ.get("GCS_CODE_PREFIX", "code/latest")  # CI/CD uploads src/*.py here
 
-MASTER_MACHINE = os.environ.get("DATAPROC_MACHINE_TYPE", "e2-standard-4")  # 4 vCPU / 16 GB; trial quota is small
+MASTER_MACHINE = os.environ.get("DATAPROC_MACHINE_TYPE", "e2-standard-8")  # 8 vCPU / 32 GB; needed for full medallion rebuilds
 BOOT_DISK_GB = int(os.environ.get("DATAPROC_DISK_GB", "100"))
 IMAGE_VERSION = os.environ.get("DATAPROC_IMAGE_VERSION", "2.2-debian12")  # Spark 3.5
 CLUSTER_MAX_HOURS = int(os.environ.get("DATAPROC_MAX_HOURS", "6"))  # safety net if Airflow dies mid-run
@@ -121,7 +121,13 @@ def _job(main_file: str, args: list[str], extra_modules: bool) -> dict:
     pyspark_job = {
         "main_python_file_uri": f"{CODE_URI}/{main_file}",
         "args": args,
-        "properties": {"spark.sql.ansi.enabled": "false"},
+        "properties": {
+            "spark.sql.ansi.enabled": "false",
+            "spark.sql.shuffle.partitions": "64",
+            "spark.sql.sources.partitionOverwriteMode": "dynamic",
+            "spark.sql.adaptive.enabled": "true",
+            "spark.sql.adaptive.coalescePartitions.enabled": "true",
+        },
     }
     if extra_modules:
         pyspark_job["python_file_uris"] = [f"{CODE_URI}/{m}" for m in MODULES]
