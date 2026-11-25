@@ -56,7 +56,7 @@ RAW_PREFIX = os.environ.get("GCS_RAW_PREFIX", "raw/nyc_tlc")
 LAKE_PREFIX = os.environ.get("GCS_LAKE_PREFIX", "medallion")
 CODE_PREFIX = os.environ.get("GCS_CODE_PREFIX", "code/latest")  # CI/CD uploads src/*.py here
 
-MASTER_MACHINE = os.environ.get("DATAPROC_MACHINE_TYPE", "e2-standard-8")  # 8 vCPU / 32 GB; needed for full medallion rebuilds
+MASTER_MACHINE = os.environ.get("DATAPROC_MACHINE_TYPE", "e2-highmem-4")  # 4 vCPU / 32 GB; fits small CPU quotas while giving memory for full rebuilds
 BOOT_DISK_GB = int(os.environ.get("DATAPROC_DISK_GB", "100"))
 IMAGE_VERSION = os.environ.get("DATAPROC_IMAGE_VERSION", "2.2-debian12")  # Spark 3.5
 CLUSTER_MAX_HOURS = int(os.environ.get("DATAPROC_MAX_HOURS", "6"))  # safety net if Airflow dies mid-run
