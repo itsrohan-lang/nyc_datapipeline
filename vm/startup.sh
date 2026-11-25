@@ -47,6 +47,7 @@ Wants=network-online.target
 [Service]
 User=airflow
 EnvironmentFile=/etc/airflow.env
+Environment="PATH=${AF_HOME}/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
 WorkingDirectory=${AF_HOME}
 ExecStart=${AF_HOME}/venv/bin/airflow standalone
 Restart=always
