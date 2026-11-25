@@ -228,13 +228,19 @@ with DAG(
 
     @task(
         task_id="delete_cluster",
-        trigger_rule=getattr(TriggerRule, "ALL_DONE_MIN_ONE_SUCCESS", TriggerRule.ALL_DONE),
+        trigger_rule=TriggerRule.ALL_DONE,
         retries=3,
         retry_delay=timedelta(minutes=1),
     )
-    def delete_cluster() -> None:
+    def delete_cluster(**context) -> None:
         from airflow.providers.google.cloud.hooks.dataproc import DataprocHook
         from google.api_core.exceptions import NotFound
+
+        dag_run = context["dag_run"]
+        create_ti = dag_run.get_task_instance("create_cluster")
+        if create_ti.state != "success":
+            print(f"create_cluster state is {create_ti.state}; no cluster to delete")
+            return
 
         hook = DataprocHook()
         try:
