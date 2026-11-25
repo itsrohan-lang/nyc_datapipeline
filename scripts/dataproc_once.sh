@@ -28,8 +28,10 @@ gcloud dataproc clusters create "$CLUSTER" --project="$PROJECT_ID" --region="$RE
 
 # STEPS lets you re-run only part of the pipeline, e.g. STEPS="silver gold validate" (Bronze already in GCS).
 STEPS="${STEPS:-pipeline_all validate}"
+# Extra Spark props help large rewrites on single-node clusters (override with SPARK_PROPS).
+SPARK_PROPS="${SPARK_PROPS:-spark.sql.ansi.enabled=false,spark.sql.shuffle.partitions=64,spark.sql.sources.partitionOverwriteMode=dynamic,spark.driver.memory=12g,spark.executor.memory=12g}"
 for step in $STEPS; do
   echo "==> Running ${step}"
   gcloud dataproc jobs submit pyspark "${CODE}/${step}.py" --project="$PROJECT_ID" --region="$REGION" \
-    --cluster="$CLUSTER" --py-files="$PY_FILES" --properties=spark.sql.ansi.enabled=false
+    --cluster="$CLUSTER" --py-files="$PY_FILES" --properties="$SPARK_PROPS"
 done
