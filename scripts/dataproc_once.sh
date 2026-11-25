@@ -2,6 +2,7 @@
 # Manual smoke test on a throw-away single-node Dataproc cluster (what the DAG does, minus Airflow).
 # Uploads src/ to gs://BUCKET/code/manual/, creates the cluster, runs pipeline + validate, ALWAYS deletes the cluster.
 # Usage: source .env && scripts/dataproc_once.sh
+#        DATAPROC_MACHINE_TYPE=e2-standard-8 STEPS="silver gold validate" scripts/dataproc_once.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,8 +26,10 @@ gcloud dataproc clusters create "$CLUSTER" --project="$PROJECT_ID" --region="$RE
   --single-node --master-machine-type="$MACHINE" --master-boot-disk-size=100GB \
   --image-version=2.2-debian12 --max-age=6h
 
-gcloud dataproc jobs submit pyspark "${CODE}/pipeline_all.py" --project="$PROJECT_ID" --region="$REGION" \
-  --cluster="$CLUSTER" --py-files="$PY_FILES" --properties=spark.sql.ansi.enabled=false
-
-gcloud dataproc jobs submit pyspark "${CODE}/validate.py" --project="$PROJECT_ID" --region="$REGION" \
-  --cluster="$CLUSTER" --py-files="$PY_FILES"
+# STEPS lets you re-run only part of the pipeline, e.g. STEPS="silver gold validate" (Bronze already in GCS).
+STEPS="${STEPS:-pipeline_all validate}"
+for step in $STEPS; do
+  echo "==> Running ${step}"
+  gcloud dataproc jobs submit pyspark "${CODE}/${step}.py" --project="$PROJECT_ID" --region="$REGION" \
+    --cluster="$CLUSTER" --py-files="$PY_FILES" --properties=spark.sql.ansi.enabled=false
+done
