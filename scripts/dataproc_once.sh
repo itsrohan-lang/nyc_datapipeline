@@ -30,7 +30,7 @@ gcloud dataproc clusters create "$CLUSTER" --project="$PROJECT_ID" --region="$RE
 STEPS="${STEPS:-pipeline_all validate}"
 # Extra Spark props help large rewrites on single-node clusters (override with SPARK_PROPS).
 # Avoid hardcoding driver/executor memory here: on single-node Dataproc it can exceed YARN/container limits.
-SPARK_PROPS="${SPARK_PROPS:-spark.sql.ansi.enabled=false,spark.sql.shuffle.partitions=64,spark.sql.sources.partitionOverwriteMode=dynamic}"
+SPARK_PROPS="${SPARK_PROPS:-spark.sql.ansi.enabled=false,spark.sql.shuffle.partitions=200,spark.sql.sources.partitionOverwriteMode=dynamic,spark.sql.adaptive.enabled=true,spark.sql.adaptive.coalescePartitions.enabled=true}"
 for step in $STEPS; do
   echo "==> Running ${step}"
   gcloud dataproc jobs submit pyspark "${CODE}/${step}.py" --project="$PROJECT_ID" --region="$REGION" \

@@ -66,8 +66,10 @@ def run(spark: SparkSession, args) -> None:
     if args.only in ("all", "fact"):
         (
             transform_trips(spark.read.parquet(paths.brz_trips), args.min_pickup_date, args.max_pickup_date)
-            .repartition("pickup_date")
-            .write.mode("overwrite").partitionBy("pickup_date").parquet(paths.slv_trips)
+            .write.mode("overwrite")
+            .option("maxRecordsPerFile", 500000)
+            .partitionBy("pickup_date")
+            .parquet(paths.slv_trips)
         )
     if args.only in ("all", "dim"):
         transform_zones(spark.read.parquet(paths.brz_zones)).write.mode("overwrite").parquet(paths.slv_zones)
