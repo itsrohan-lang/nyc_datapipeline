@@ -233,8 +233,8 @@ with DAG(
         retry_delay=timedelta(minutes=1),
     )
     def delete_cluster() -> None:
-        from google.api_core.exceptions import NotFound
         from airflow.providers.google.cloud.hooks.dataproc import DataprocHook
+        from google.api_core.exceptions import NotFound
 
         hook = DataprocHook()
         try:
