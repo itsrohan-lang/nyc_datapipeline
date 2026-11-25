@@ -69,7 +69,7 @@ def _run_trips_in_batches(spark: SparkSession, paths: LakePaths, args) -> None:
     max_pickup = (
         dt.date.fromisoformat(args.max_pickup_date) - dt.timedelta(days=1)
         if args.max_pickup_date
-        else dt.datetime.utcnow().date()
+        else dt.datetime.now(dt.UTC).date()
     )
     batch_size = max(1, int(getattr(args, "batch_days", 30)))
 
