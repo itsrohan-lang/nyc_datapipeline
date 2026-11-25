@@ -52,10 +52,22 @@ source .env && airflow standalone
 Trigger `nyc_taxi_dataproc`. Params: `month` (`YYYY-MM`) and `force_rebuild` (rebuild even if nothing new).
 Cluster per run: single node, `e2-standard-4`, deleted at the end, plus a 6 h auto-delete TTL as a safety net.
 
+## 4b. Run Airflow on Compute Engine (instead of your laptop)
+
+```bash
+source .env && scripts/create_airflow_vm.sh     # creates SA, IAM roles and an e2-medium VM
+gcloud storage cp dags/*.py gs://nyc_taxi_51124112026/dags/   # first time only; afterwards CI/CD does it
+```
+The VM installs Airflow 2.10.5, runs it as a systemd service (restarts on crash/reboot) and pulls
+`gs://BUCKET/dags` every minute. It authenticates with its own service account, so no keys or
+`gcloud auth` are needed on the VM. The UI is not public: open it through an SSH tunnel
+(`gcloud compute ssh airflow-vm --zone ZONE -- -L 8080:localhost:8080`, then http://localhost:8080).
+Stop paying for it with `gcloud compute instances stop airflow-vm --zone ZONE` (the schedule won't fire while stopped).
+
 ## 5. CI/CD
 
 * Pull request / push: ruff, pytest (local Spark), DAG import + wiring test.
-* Push to `main`: copies `src/*.py` to `gs://BUCKET/code/<commit>/` and `gs://BUCKET/code/latest/`. The DAG runs `code/latest`.
+* Push to `main`: copies `src/*.py` to `gs://BUCKET/code/<commit>/` and `gs://BUCKET/code/latest/` (the DAG runs `code/latest`), and `dags/*.py` to `gs://BUCKET/dags/` (the Airflow VM syncs from there).
 
 ## Trial-account notes
 

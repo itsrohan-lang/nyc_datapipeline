@@ -58,3 +58,5 @@ jobs:
         run: |
           gcloud storage cp src/*.py "gs://${BUCKET}/code/${GITHUB_SHA}/"
           gcloud storage cp src/*.py "gs://${BUCKET}/code/latest/"
+      - name: Publish DAGs (the Airflow VM pulls them every minute)
+        run: gcloud storage cp dags/*.py "gs://${BUCKET}/dags/"
