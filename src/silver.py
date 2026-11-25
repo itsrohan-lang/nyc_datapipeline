@@ -62,34 +62,37 @@ def transform_zones(bronze: DataFrame) -> DataFrame:
 
 
 def _run_trips_in_batches(spark: SparkSession, paths: LakePaths, args) -> None:
-    bronze = spark.read.parquet(paths.brz_trips)
-    dates = [
-        row["pickup_date"]
-        for row in (
-            transform_trips(bronze, args.min_pickup_date, args.max_pickup_date)
-            .select("pickup_date")
-            .where(F.col("pickup_date").isNotNull())
-            .distinct()
-            .orderBy("pickup_date")
-            .collect()
-        )
-    ]
-    if not dates:
-        return
+    import datetime as dt
 
+    bronze = spark.read.parquet(paths.brz_trips)
+    min_pickup = dt.date.fromisoformat(args.min_pickup_date)
+    max_pickup = (
+        dt.date.fromisoformat(args.max_pickup_date) - dt.timedelta(days=1)
+        if args.max_pickup_date
+        else dt.datetime.utcnow().date()
+    )
     batch_size = max(1, int(getattr(args, "batch_days", 30)))
-    for i in range(0, len(dates), batch_size):
-        batch = dates[i : i + batch_size]
-        start, end = batch[0], batch[-1]
-        batch_df = transform_trips(bronze, args.min_pickup_date, args.max_pickup_date).filter(
-            F.col("pickup_date").between(F.lit(start), F.lit(end))
+
+    start = min_pickup
+    first = True
+    while start <= max_pickup:
+        end = min(start + dt.timedelta(days=batch_size - 1), max_pickup)
+        # Rough prefilter on raw timestamp string/column reduces data before expensive transforms.
+        raw = bronze.filter(
+            (F.to_date(F.col("tpep_pickup_datetime")) >= F.lit(start.isoformat()))
+            & (F.to_date(F.col("tpep_pickup_datetime")) <= F.lit(end.isoformat()))
+        )
+        batch_df = transform_trips(raw, args.min_pickup_date, args.max_pickup_date).filter(
+            F.col("pickup_date").between(F.lit(start.isoformat()), F.lit(end.isoformat()))
         )
         writer = batch_df.write.option("maxRecordsPerFile", 250000).partitionBy("pickup_date")
-        if i == 0:
+        if first:
             writer.mode("overwrite").parquet(paths.slv_trips)
+            first = False
         else:
             spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
             writer.mode("overwrite").parquet(paths.slv_trips)
+        start = end + dt.timedelta(days=1)
 
 
 def run(spark: SparkSession, args) -> None:

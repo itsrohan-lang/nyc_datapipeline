@@ -31,8 +31,13 @@ STEPS="${STEPS:-pipeline_all validate}"
 # Extra Spark props help large rewrites on single-node clusters (override with SPARK_PROPS).
 # Avoid hardcoding driver/executor memory here: on single-node Dataproc it can exceed YARN/container limits.
 SPARK_PROPS="${SPARK_PROPS:-spark.sql.ansi.enabled=false,spark.sql.shuffle.partitions=200,spark.sql.sources.partitionOverwriteMode=dynamic,spark.sql.adaptive.enabled=true,spark.sql.adaptive.coalescePartitions.enabled=true}"
+SILVER_BATCH_DAYS="${SILVER_BATCH_DAYS:-7}"
 for step in $STEPS; do
   echo "==> Running ${step}"
+  extra_args=()
+  if [[ "$step" == "silver" ]]; then
+    extra_args+=(-- --batch-days "$SILVER_BATCH_DAYS")
+  fi
   gcloud dataproc jobs submit pyspark "${CODE}/${step}.py" --project="$PROJECT_ID" --region="$REGION" \
-    --cluster="$CLUSTER" --py-files="$PY_FILES" --properties="$SPARK_PROPS"
+    --cluster="$CLUSTER" --py-files="$PY_FILES" --properties="$SPARK_PROPS" "${extra_args[@]}"
 done
