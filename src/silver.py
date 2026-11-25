@@ -61,16 +61,41 @@ def transform_zones(bronze: DataFrame) -> DataFrame:
     )
 
 
+def _run_trips_in_batches(spark: SparkSession, paths: LakePaths, args) -> None:
+    bronze = spark.read.parquet(paths.brz_trips)
+    dates = [
+        row["pickup_date"]
+        for row in (
+            transform_trips(bronze, args.min_pickup_date, args.max_pickup_date)
+            .select("pickup_date")
+            .where(F.col("pickup_date").isNotNull())
+            .distinct()
+            .orderBy("pickup_date")
+            .collect()
+        )
+    ]
+    if not dates:
+        return
+
+    batch_size = max(1, int(getattr(args, "batch_days", 30)))
+    for i in range(0, len(dates), batch_size):
+        batch = dates[i : i + batch_size]
+        start, end = batch[0], batch[-1]
+        batch_df = transform_trips(bronze, args.min_pickup_date, args.max_pickup_date).filter(
+            F.col("pickup_date").between(F.lit(start), F.lit(end))
+        )
+        writer = batch_df.write.option("maxRecordsPerFile", 250000).partitionBy("pickup_date")
+        if i == 0:
+            writer.mode("overwrite").parquet(paths.slv_trips)
+        else:
+            spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+            writer.mode("overwrite").parquet(paths.slv_trips)
+
+
 def run(spark: SparkSession, args) -> None:
     paths = LakePaths.from_root(args.lake_root)
     if args.only in ("all", "fact"):
-        (
-            transform_trips(spark.read.parquet(paths.brz_trips), args.min_pickup_date, args.max_pickup_date)
-            .write.mode("overwrite")
-            .option("maxRecordsPerFile", 500000)
-            .partitionBy("pickup_date")
-            .parquet(paths.slv_trips)
-        )
+        _run_trips_in_batches(spark, paths, args)
     if args.only in ("all", "dim"):
         transform_zones(spark.read.parquet(paths.brz_zones)).write.mode("overwrite").parquet(paths.slv_zones)
 

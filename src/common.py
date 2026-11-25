@@ -57,4 +57,8 @@ def base_parser(description: str) -> argparse.ArgumentParser:
         "--max-pickup-date", default=None,
         help="Silver keeps trips picked up before this date (exclusive). Default: tomorrow (UTC), so new years never get dropped",
     )
+    parser.add_argument(
+        "--batch-days", type=int, default=30,
+        help="Silver fact writes this many pickup dates per batch to reduce single-node memory pressure",
+    )
     return parser
