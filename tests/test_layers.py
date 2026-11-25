@@ -87,6 +87,17 @@ def test_validate_evaluate():
     with pytest.raises(ValueError):
         validate.evaluate({**ok, "bronze_trips": 0})
 
+    scoped = {
+        "bronze_trips": 200,
+        "bronze_trips_in_scope": 100,
+        "silver_trips": 95,
+        "gold_trips": 95,
+        "gold_zones": 265,
+    }
+    assert validate.evaluate(scoped) == pytest.approx(0.95)
+    with pytest.raises(ValueError):
+        validate.evaluate({**scoped, "bronze_trips_in_scope": 0})
+
 
 def test_end_to_end_local(spark, tmp_path):
     """Writes two tiny parquet 'months' and runs bronze -> silver -> gold -> validate on local disk."""

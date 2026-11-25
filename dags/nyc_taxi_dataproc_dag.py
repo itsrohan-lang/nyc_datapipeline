@@ -217,7 +217,11 @@ with DAG(
         region=REGION,
         job=_job(
             "validate.py",
-            ["--lake-root", LAKE_URI, "--min-keep-ratio", str(MIN_KEEP_RATIO)],
+            [
+                "--lake-root", LAKE_URI,
+                "--min-keep-ratio", str(MIN_KEEP_RATIO),
+                "--min-pickup-date", "2019-01-01",
+            ],
             extra_modules=True,
         ),
         execution_timeout=timedelta(minutes=30),
