@@ -238,27 +238,21 @@ with DAG(
         retries=3,
         retry_delay=timedelta(minutes=1),
     )
-    def delete_cluster(**context) -> None:
+    def delete_cluster(cluster_name: str) -> None:  # passed as an argument so Jinja renders it
         from airflow.providers.google.cloud.hooks.dataproc import DataprocHook
         from google.api_core.exceptions import NotFound
 
-        dag_run = context["dag_run"]
-        create_ti = dag_run.get_task_instance("create_cluster")
-        if create_ti.state != "success":
-            print(f"create_cluster state is {create_ti.state}; no cluster to delete")
-            return
-
         hook = DataprocHook()
         try:
-            op = hook.delete_cluster(project_id=PROJECT_ID, region=REGION, cluster_name=CLUSTER_NAME)
+            op = hook.delete_cluster(project_id=PROJECT_ID, region=REGION, cluster_name=cluster_name)
             hook.wait_for_operation(timeout=20 * 60, result_retry=None, operation=op)
-            print(f"Deleted cluster {CLUSTER_NAME}")
+            print(f"Deleted cluster {cluster_name}")
         except NotFound:
-            print(f"Cluster {CLUSTER_NAME} not found; it may already be deleted")
+            print(f"Cluster {cluster_name} not found; it may already be deleted")
 
     done = EmptyOperator(task_id="done")  # all_success: fails the run if run/validate failed
 
-    cleanup = delete_cluster()
+    cleanup = delete_cluster(CLUSTER_NAME)
     download_new_months() >> create_cluster >> run_medallion >> validate_output
     [create_cluster, run_medallion, validate_output] >> cleanup
     [validate_output, cleanup] >> done

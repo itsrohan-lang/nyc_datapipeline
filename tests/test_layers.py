@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 from pyspark.sql import functions as F
@@ -127,3 +128,40 @@ def test_end_to_end_local(spark, tmp_path):
     assert spark.read.parquet(paths.brz_trips).count() == 2
     assert spark.read.parquet(paths.gld_trips).count() == 2
     assert spark.read.parquet(paths.gld_zones).count() == 2
+
+
+def test_fact_tables_get_success_marker_with_dynamic_overwrite(spark, tmp_path):
+    """Dynamic partition overwrite writes no _SUCCESS; validation needs a fresh marker anyway."""
+    import argparse
+
+    import common
+
+    previous = spark.conf.get("spark.sql.sources.partitionOverwriteMode", None)
+    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    try:
+        paths = common.LakePaths.from_root(str(tmp_path / "lake"))
+        _bronze_trips(spark, [GOOD]).write.parquet(paths.brz_trips)
+        spark.createDataFrame(
+            [(1, "Manhattan", "Alpha", "Yellow Zone")],
+            ["LocationID", "Borough", "Zone", "service_zone"],
+        ).write.parquet(paths.brz_zones)
+
+        args = argparse.Namespace(
+            trip_path=str(tmp_path / "yellow"),
+            taxi_zone_path=str(tmp_path / "zones.csv"),
+            lake_root=str(tmp_path / "lake"),
+            only="all",
+            min_pickup_date="2024-01-01",
+            max_pickup_date="2024-01-02",
+            batch_days=1,
+        )
+        silver.run(spark, args)
+        gold.run(spark, args)
+
+        for table in (paths.slv_trips, paths.gld_trips):
+            assert (Path(table) / "_SUCCESS").is_file(), f"missing _SUCCESS in {table}"
+    finally:
+        if previous is None:
+            spark.conf.unset("spark.sql.sources.partitionOverwriteMode")
+        else:
+            spark.conf.set("spark.sql.sources.partitionOverwriteMode", previous)

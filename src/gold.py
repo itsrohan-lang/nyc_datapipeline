@@ -46,7 +46,7 @@ def run(spark: SparkSession, args) -> None:
         transform_zones(spark.read.parquet(paths.slv_zones)).write.mode("overwrite").parquet(paths.gld_zones)
     if args.only in ("all", "fact"):
         build_fact(spark.read.parquet(paths.slv_trips), spark.read.parquet(paths.gld_zones)) \
-            .write.mode("overwrite").partitionBy("pickup_date").parquet(paths.gld_trips)
+            .write.option("partitionOverwriteMode", "static").mode("overwrite").partitionBy("pickup_date").parquet(paths.gld_trips)
 
 
 def main(argv=None) -> None:

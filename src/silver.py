@@ -61,6 +61,11 @@ def transform_zones(bronze: DataFrame) -> DataFrame:
     )
 
 
+def _mark_complete(spark: SparkSession, table_path: str) -> None:
+    path = spark._jvm.org.apache.hadoop.fs.Path(f"{table_path}/_SUCCESS")
+    path.getFileSystem(spark._jsc.hadoopConfiguration()).create(path, True).close()
+
+
 def _run_trips_in_batches(spark: SparkSession, paths: LakePaths, args) -> None:
     import datetime as dt
 
@@ -69,7 +74,7 @@ def _run_trips_in_batches(spark: SparkSession, paths: LakePaths, args) -> None:
     max_pickup = (
         dt.date.fromisoformat(args.max_pickup_date) - dt.timedelta(days=1)
         if args.max_pickup_date
-        else dt.datetime.now(dt.UTC).date()
+        else dt.datetime.now(dt.timezone.utc).date()
     )
     batch_size = max(1, int(getattr(args, "batch_days", 30)))
 
@@ -87,12 +92,15 @@ def _run_trips_in_batches(spark: SparkSession, paths: LakePaths, args) -> None:
         )
         writer = batch_df.write.option("maxRecordsPerFile", 250000).partitionBy("pickup_date")
         if first:
-            writer.mode("overwrite").parquet(paths.slv_trips)
+            writer.option("partitionOverwriteMode", "static").mode("overwrite").parquet(paths.slv_trips)
+            marker = spark._jvm.org.apache.hadoop.fs.Path(f"{paths.slv_trips}/_SUCCESS")
+            marker.getFileSystem(spark._jsc.hadoopConfiguration()).delete(marker, False)  # not complete until every batch is
             first = False
         else:
             spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
             writer.mode("overwrite").parquet(paths.slv_trips)
         start = end + dt.timedelta(days=1)
+    _mark_complete(spark, paths.slv_trips)
 
 
 def run(spark: SparkSession, args) -> None:
