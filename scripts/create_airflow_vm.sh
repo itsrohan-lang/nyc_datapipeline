@@ -6,10 +6,10 @@ cd "$(dirname "$0")/.."
 
 PROJECT_ID="${GCP_PROJECT_ID:-project-d744f265-a9df-4eb3-b93}"
 BUCKET="${GCS_BUCKET:-nyc_taxi_51124112026}"
-REGION="${DATAPROC_REGION:-us-central1}"
+REGION="${DATAPROC_REGION:-asia-south1}"  # bucket is ASIA-SOUTH1
 ZONE="${VM_ZONE:-${REGION}-a}"
 VM="${VM_NAME:-airflow-vm}"
-MACHINE="${VM_MACHINE_TYPE:-e2-medium}"   # 2 vCPU / 4 GB; Airflow needs ~2 GB+
+MACHINE="${VM_MACHINE_TYPE:-n2-standard-2}"   # 2 vCPU / 8 GB; E2 quota is 0 in asia-south1
 SA_NAME="airflow-runner"
 
 gcloud config set project "$PROJECT_ID" >/dev/null

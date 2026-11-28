@@ -50,13 +50,14 @@ from airflow.providers.google.cloud.operators.dataproc import (
 
 # ---------------------------------------------------------------- configuration
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "project-d744f265-a9df-4eb3-b93")
-REGION = os.environ.get("DATAPROC_REGION", "us-central1")  # keep it equal to your bucket's region (see scripts/setup_gcp.sh)
+REGION = os.environ.get("DATAPROC_REGION", "asia-south1")  # bucket is ASIA-SOUTH1; keep Dataproc co-located
 BUCKET = os.environ.get("GCS_BUCKET", "nyc_taxi_51124112026")
 RAW_PREFIX = os.environ.get("GCS_RAW_PREFIX", "raw/nyc_tlc")
 LAKE_PREFIX = os.environ.get("GCS_LAKE_PREFIX", "medallion")
 CODE_PREFIX = os.environ.get("GCS_CODE_PREFIX", "code/latest")  # CI/CD uploads src/*.py here
 
-MASTER_MACHINE = os.environ.get("DATAPROC_MACHINE_TYPE", "e2-highmem-4")  # 4 vCPU / 32 GB; fits small CPU quotas while giving memory for full rebuilds
+MASTER_MACHINE = os.environ.get("DATAPROC_MACHINE_TYPE", "n2-highmem-8")  # 8 vCPU / 64 GB; global CPUS_ALL_REGIONS quota is 12, E2 quota is 0 here
+SILVER_BATCH_DAYS = os.environ.get("SILVER_BATCH_DAYS", "90")  # fewer passes over Bronze on GCS; still small enough for one node
 BOOT_DISK_GB = int(os.environ.get("DATAPROC_DISK_GB", "100"))
 IMAGE_VERSION = os.environ.get("DATAPROC_IMAGE_VERSION", "2.2-debian12")  # Spark 3.5
 CLUSTER_MAX_HOURS = int(os.environ.get("DATAPROC_MAX_HOURS", "6"))  # safety net if Airflow dies mid-run
@@ -210,7 +211,8 @@ with DAG(
         region=REGION,
         job=_job(
             "pipeline_all.py",
-            ["--trip-path", TRIP_URI, "--taxi-zone-path", ZONE_URI, "--lake-root", LAKE_URI],
+            ["--trip-path", TRIP_URI, "--taxi-zone-path", ZONE_URI, "--lake-root", LAKE_URI,
+             "--batch-days", SILVER_BATCH_DAYS],
             extra_modules=True,
         ),
         execution_timeout=timedelta(hours=5),

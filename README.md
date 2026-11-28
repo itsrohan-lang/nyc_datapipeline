@@ -50,7 +50,7 @@ export AIRFLOW__CORE__DAGS_FOLDER=$PWD/dags
 source .env && airflow standalone
 ```
 Trigger `nyc_taxi_dataproc`. Params: `month` (`YYYY-MM`) and `force_rebuild` (rebuild even if nothing new).
-Cluster per run: single node, `e2-highmem-4` by default (4 vCPU/32 GB, override `DATAPROC_MACHINE_TYPE`), deleted at the end, plus a 6 h auto-delete TTL as a safety net.
+Cluster per run: single node, `n2-highmem-8` by default (8 vCPU/64 GB, override `DATAPROC_MACHINE_TYPE`), deleted at the end, plus a 6 h auto-delete TTL as a safety net. Dataproc runs in `asia-south1` to match the bucket (E2 quota is zero there, so use N2). Silver writes 90 pickup days per batch by default (`SILVER_BATCH_DAYS`) to cut repeated Bronze scans.
 
 ## 4b. Run Airflow on Compute Engine (instead of your laptop)
 
@@ -71,6 +71,6 @@ Stop paying for it with `gcloud compute instances stop airflow-vm --zone ZONE` (
 
 ## Trial-account notes
 
-* Trial quotas are small: keep the single node (4 vCPU). Raise `DATAPROC_MACHINE_TYPE` only if quota allows.
-* Keep the Dataproc region equal to the bucket region to avoid cross-region transfer charges and slowness.
+* Global `CPUS_ALL_REGIONS` quota is 12 (regional quota alone is misleading). The defaults — `n2-highmem-8` for Dataproc plus `n2-standard-2` for the Airflow VM — use 10 of the 12. E2 quota is 0 in `asia-south1`.
+* Keep the Dataproc region equal to the bucket region (`asia-south1`) to avoid cross-region transfer charges and slowness.
 * Check **Console -> Dataproc -> Clusters** is empty after runs.

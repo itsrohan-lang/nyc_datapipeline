@@ -8,8 +8,8 @@ cd "$(dirname "$0")/.."
 
 PROJECT_ID="${GCP_PROJECT_ID:-project-d744f265-a9df-4eb3-b93}"
 BUCKET="${GCS_BUCKET:-nyc_taxi_51124112026}"
-REGION="${DATAPROC_REGION:-us-central1}"
-MACHINE="${DATAPROC_MACHINE_TYPE:-e2-standard-4}"
+REGION="${DATAPROC_REGION:-asia-south1}"  # bucket is ASIA-SOUTH1
+MACHINE="${DATAPROC_MACHINE_TYPE:-n2-highmem-8}"
 CLUSTER="nyc-taxi-manual-$(date +%H%M%S)"
 CODE="gs://${BUCKET}/code/manual"
 PY_FILES="${CODE}/common.py,${CODE}/bronze.py,${CODE}/silver.py,${CODE}/gold.py"
@@ -31,11 +31,11 @@ STEPS="${STEPS:-pipeline_all validate}"
 # Extra Spark props help large rewrites on single-node clusters (override with SPARK_PROPS).
 # Avoid hardcoding driver/executor memory here: on single-node Dataproc it can exceed YARN/container limits.
 SPARK_PROPS="${SPARK_PROPS:-spark.sql.ansi.enabled=false,spark.sql.shuffle.partitions=200,spark.sql.sources.partitionOverwriteMode=dynamic,spark.sql.adaptive.enabled=true,spark.sql.adaptive.coalescePartitions.enabled=true}"
-SILVER_BATCH_DAYS="${SILVER_BATCH_DAYS:-7}"
+SILVER_BATCH_DAYS="${SILVER_BATCH_DAYS:-90}"
 for step in $STEPS; do
   echo "==> Running ${step}"
   extra_args=()
-  if [[ "$step" == "silver" ]]; then
+  if [[ "$step" == "silver" || "$step" == "pipeline_all" ]]; then
     extra_args+=(-- --batch-days "$SILVER_BATCH_DAYS")
   fi
   gcloud dataproc jobs submit pyspark "${CODE}/${step}.py" --project="$PROJECT_ID" --region="$REGION" \
